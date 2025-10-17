@@ -98,31 +98,26 @@ plot(_st, title="Supertrend", style=plot.style_line, linewidth=2, color=supertre
 
 bgcolor(bg_coloring ? (trend_norm > 0.2 ? color.new(color.green, 90) : trend_norm < -0.2 ? color.new(color.red, 90) : na) : na)
 
-// -------------------------- Señales de texto discretas (misma fuente XRP) --------------------------
+// -------------------------- Señales de texto discretas --------------------------
 if buy_signal
     label.new(bar_index, low, "BUY", style=label.style_label_left, textcolor=color.new(color.blue,0), color=color.new(color.white,100), size=size.tiny, yloc=yloc.belowbar)
 if sell_signal
     label.new(bar_index, high, "SELL", style=label.style_label_left, textcolor=color.new(color.red,0), color=color.new(color.white,100), size=size.tiny, yloc=yloc.abovebar)
-
 if ema_cross_up
     label.new(bar_index, low, "BUY", style=label.style_label_left, textcolor=color.new(color.blue,0), color=color.new(color.white,100), size=size.tiny, yloc=yloc.belowbar)
 if ema_cross_down
     label.new(bar_index, high, "SELL", style=label.style_label_left, textcolor=color.new(color.red,0), color=color.new(color.white,100), size=size.tiny, yloc=yloc.abovebar)
-
 if rsi_long_entry and vol_ok
     label.new(bar_index, low, "BUY", style=label.style_label_left, textcolor=color.new(color.blue,0), color=color.new(color.white,100), size=size.tiny, yloc=yloc.belowbar)
 if rsi_short_entry and vol_ok
     label.new(bar_index, high, "SELL", style=label.style_label_left, textcolor=color.new(color.red,0), color=color.new(color.white,100), size=size.tiny, yloc=yloc.abovebar)
 
-// -------------------------- Info Label --------------------------
+// -------------------------- Info Label (texto blanco) --------------------------
 var label statusLabel = na
-statusText = "Trend: " + (trend_norm > 0.2 ? "Bullish" : trend_norm < -0.2 ? "Bearish" : "Neutral") +
-     "\nEMA: " + str.tostring(ema_fast_len) + "/" + str.tostring(ema_slow_len) +
-     "\nRSI: " + str.tostring(rsi, format.mintick) +
-     "\nVol: " + (vol_ok ? "OK" : "Low")
+statusText = "Trend: " + (trend_norm > 0.2 ? "Bullish" : trend_norm < -0.2 ? "Bearish" : "Neutral") + "\nEMA: " + str.tostring(ema_fast_len) + "/" + str.tostring(ema_slow_len) + "\nRSI: " + str.tostring(rsi, format.mintick) + "\nVol: " + (vol_ok ? "OK" : "Low")
 if barstate.islast
     label.delete(statusLabel[1])
-    statusLabel := label.new(bar_index, high, text=statusText, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_left, color=color.new(color.gray, 85), textcolor=color.white, size=size.small)
+    statusLabel := label.new(bar_index, high, statusText, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_left, color=color.new(color.gray, 70), textcolor=color.white, size=size.small)
 
 // -------------------------- Alertas --------------------------
 alertcondition(buy_signal, title="STMV: BUY Signal", message="STMV: BUY signal on {{ticker}} at {{close}}")
