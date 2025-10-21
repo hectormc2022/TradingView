@@ -1,0 +1,97 @@
+// Indicador para el análisis de USD/MXN.
+
+//@version=5
+indicator("USD/MXN Master Analyzer (ADX manual definitivo)", shorttitle="MasterAnalyzer", overlay=true, max_labels_count=500)
+
+// -------------------------- Inputs --------------------------
+emaFastLen   = input.int(20, "EMA Rápida")
+emaSlowLen   = input.int(50, "EMA Lenta")
+rsiLen       = input.int(14, "RSI Periodo")
+adxLen       = input.int(14, "ADX Periodo")
+bbLen        = input.int(20, "Bandas Bollinger Periodo")
+bbMult       = input.float(2.0, "Desviación Bollinger")
+volMaLen     = input.int(20, "Media Volumen")
+showPivot    = input.bool(true, "Mostrar Soportes/Resistencias")
+showSignals  = input.bool(true, "Mostrar Señales")
+showBackground= input.bool(true, "Colorear Fondo (Tendencia)")
+
+// -------------------------- Cálculos básicos --------------------------
+emaFast = ta.ema(close, emaFastLen)
+emaSlow = ta.ema(close, emaSlowLen)
+rsi     = ta.rsi(close, rsiLen)
+
+// --- ADX calculado manualmente (compatibilidad total) ---
+// 1) +DM / -DM
+upMove   = high - high[1]
+downMove = low[1] - low
+plusDM   = (upMove > downMove and upMove > 0) ? upMove : 0.0
+minusDM  = (downMove > upMove and downMove > 0) ? downMove : 0.0
+
+// 2) Suavizado de +DM / -DM y ATR (Wilder smoothing / RMA)
+smPlusDM  = ta.rma(plusDM, adxLen)
+smMinusDM = ta.rma(minusDM, adxLen)
+smTR      = ta.rma(ta.tr, adxLen)
+
+// Evitar división por cero
+plusDI  = smTR != 0 ? 100 * smPlusDM / smTR : 0.0
+minusDI = smTR != 0 ? 100 * smMinusDM / smTR : 0.0
+
+// 3) DX y ADX
+dx = (plusDI + minusDI) != 0 ? 100 * math.abs(plusDI - minusDI) / (plusDI + minusDI) : 0.0
+adx = ta.rma(dx, adxLen)
+
+// Bandas de Bollinger
+basis  = ta.sma(close, bbLen)
+dev    = bbMult * ta.stdev(close, bbLen)
+bbUpper = basis + dev
+bbLower = basis - dev
+
+// Volumen relativo
+volMa = ta.sma(volume, volMaLen)
+volOk = volume > volMa
+
+// -------------------------- Tendencia y momento --------------------------
+bullTrend = emaFast > emaSlow and adx > 20
+bearTrend = emaFast < emaSlow and adx > 20
+
+// -------------------------- Señales --------------------------
+longSignal  = ta.crossover(emaFast, emaSlow) and rsi > 50 and volOk
+shortSignal = ta.crossunder(emaFast, emaSlow) and rsi < 50 and volOk
+
+// -------------------------- Pivotes (S/R) --------------------------
+pivotHigh = ta.pivothigh(high, 5, 5)
+pivotLow  = ta.pivotlow(low, 5, 5)
+
+// Dibujos S/R (cruces discretos)
+plot(showPivot ? pivotHigh : na, title="Resistencia (Pivot)", color=color.new(color.red, 0), style=plot.style_cross, linewidth=2)
+plot(showPivot ? pivotLow  : na, title="Soporte (Pivot)",    color=color.new(color.green, 0), style=plot.style_cross, linewidth=2)
+
+// -------------------------- Ploteos principales --------------------------
+plot(emaFast, title="EMA Rápida", color=color.new(color.aqua, 0), linewidth=2)
+plot(emaSlow, title="EMA Lenta",  color=color.new(color.orange, 0), linewidth=2)
+p1 = plot(bbUpper, title="Banda Superior", color=color.new(color.blue, 70))
+p2 = plot(bbLower, title="Banda Inferior", color=color.new(color.blue, 70))
+fill(p1, p2, color=color.new(color.blue, 90))
+
+// Fondo por tendencia
+bgcolor(showBackground ? (bullTrend ? color.new(color.green, 90) : bearTrend ? color.new(color.red, 90) : na) : na)
+
+// -------------------------- Señales visuales --------------------------
+if showSignals and longSignal
+    label.new(bar_index, low, "BUY", style=label.style_label_up, color=color.new(color.green, 0), textcolor=color.white, size=size.small)
+if showSignals and shortSignal
+    label.new(bar_index, high, "SELL", style=label.style_label_down, color=color.new(color.red, 0),   textcolor=color.white, size=size.small)
+
+// -------------------------- Alertas --------------------------
+alertcondition(longSignal,  title="Señal de Compra", message="USD/MXN: Señal de COMPRA detectada en {{ticker}}")
+alertcondition(shortSignal, title="Señal de Venta",  message="USD/MXN: Señal de VENTA detectada en {{ticker}}")
+
+// -------------------------- Panel de estado (seguro) --------------------------
+var label status = na
+trendText = bullTrend ? "Bullish" : bearTrend ? "Bearish" : "Neutral"
+statusText = "Tendencia: " + trendText + " | RSI: " + str.tostring(rsi, format.mintick) + " | ADX: " + str.tostring(adx, format.mintick) + " | Vol: " + (volOk ? "Fuerte" : "Débil")
+
+if barstate.islast
+    if not na(status)
+        label.delete(status)
+    status := label.new(bar_index, high, statusText, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_left, color=color.new(color.black, 60), textcolor=color.white, size=size.small)
