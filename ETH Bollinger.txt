@@ -1,0 +1,69 @@
+//@version=5
+indicator("ETH Bollinger + Stats", shorttitle="ETH BB Stats", overlay=true, max_labels_count=500)
+
+// -------------------------- Inputs --------------------------
+bb_len = input.int(20, "BB Period")
+bb_std = input.float(2.0, "BB Standard Deviation")
+
+ema_fast_len = input.int(21, "EMA Rápida")
+ema_slow_len = input.int(55, "EMA Lenta")
+
+rsi_len = input.int(14, "RSI Period")
+rsi_src = input.source(close, "RSI Source")
+rsi_smooth = input.int(3, "RSI SMA Smooth")
+
+vol_ma_len = input.int(20, "Volume MA")
+min_vol_factor = input.float(0.6, "Min Vol Factor", step=0.05)
+
+show_signals = input.bool(true, "Mostrar señales")
+show_bands = input.bool(true, "Mostrar BB")
+show_emas = input.bool(true, "Mostrar EMAs")
+
+// -------------------------- Calculations --------------------------
+ema_fast = ta.ema(close, ema_fast_len)
+ema_slow = ta.ema(close, ema_slow_len)
+
+rsi_raw = ta.rsi(rsi_src, rsi_len)
+rsi = ta.sma(rsi_raw, rsi_smooth)
+
+// Bollinger Bands
+basis = ta.sma(close, bb_len)
+dev = bb_std * ta.stdev(close, bb_len)
+bb_upper = basis + dev
+bb_lower = basis - dev
+
+// Volumen filtrado
+vol_ma = ta.sma(volume, vol_ma_len)
+vol_ok = volume >= vol_ma * min_vol_factor
+
+// Posición estadística dentro de la banda (0=lower, 1=upper)
+bb_pos = (close - bb_lower) / (bb_upper - bb_lower)
+
+// Señales
+long_signal = show_signals and (close < bb_lower and rsi < 50 and ema_fast > ema_slow and vol_ok)
+short_signal = show_signals and (close > bb_upper and rsi > 50 and ema_fast < ema_slow and vol_ok)
+
+// -------------------------- Plots --------------------------
+plot(show_emas ? ema_fast : na, title="EMA Fast", color=color.new(color.blue,0), linewidth=2)
+plot(show_emas ? ema_slow : na, title="EMA Slow", color=color.new(color.orange,0), linewidth=2)
+
+p1 = plot(show_bands ? bb_upper : na, title="BB Upper", color=color.new(color.red,50))
+p2 = plot(show_bands ? bb_lower : na, title="BB Lower", color=color.new(color.green,50))
+fill(p1, p2, title="BB Fill", color=color.new(color.gray,90))
+
+// -------------------------- Minimal Labels --------------------------
+if long_signal
+    label.new(bar_index, low, "BUY", style=label.style_label_left, textcolor=color.new(color.blue,0), size=size.tiny, yloc=yloc.belowbar, color=color.new(color.black,100))
+if short_signal
+    label.new(bar_index, high, "SELL", style=label.style_label_left, textcolor=color.new(color.red,0), size=size.tiny, yloc=yloc.abovebar, color=color.new(color.black,100))
+
+// -------------------------- Info Label --------------------------
+var label statusLabel = na
+statusText = "BB Pos: " + str.tostring(bb_pos, format.percent) + "\nEMA: " + str.tostring(ema_fast_len) + "/" + str.tostring(ema_slow_len) + "\nRSI: " + str.tostring(rsi, format.mintick) + "\nVol: " + (vol_ok ? "OK" : "Low")
+if barstate.islast
+    label.delete(statusLabel[1])
+    statusLabel := label.new(bar_index, high, statusText, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_left, color=color.new(color.black,100), textcolor=color.white, size=size.small)
+
+// -------------------------- Alerts --------------------------
+alertcondition(long_signal, title="ETH BUY", message="ETH BUY signal")
+alertcondition(short_signal, title="ETH SELL", message="ETH SELL signal")
